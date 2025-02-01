@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LACAK ORDER - KANVAS MERCHANDISE</title>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #d3d3d3;
+        }
+        header {
+            background-color: #ffffff;
+            color: rgb(34, 34, 34);
+            padding: 2em 1em;
+            text-align: center;
+            position: relative;
+        }
+        header img {
+            display: block;
+            margin: 0 auto;
+            height: 200px;
+        }
+        .container {
+            margin: 2em auto;
+            padding: 1em;
+            max-width: 800px;
+            background: rgb(230, 240, 233);
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        button {
+            padding: 0.5em 1em;
+            background-color: #48503e;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #16d666;
+        }
+        .progress-bar {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            position: relative;
+            margin: 20px 0;
+        }
+        .progress-bar::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 20px;
+            width: 4px;
+            height: 100%;
+            background-color: #ddd;
+            z-index: 0;
+        }
+        .progress-item {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+        }
+        .progress-item .status {
+            width: 24px;
+            height: 24px;
+            background-color: #ddd;
+            border-radius: 50%;
+            margin-right: 10px;
+            flex-shrink: 0;
+        }
+        .progress-item .status.completed {
+            background-color: #008000;
+        }
+        .progress-item span {
+            display: block;
+        }
+        .progress-item .date {
+            font-size: 0.9em;
+            color: gray;
+            margin-left: 10px;
+        }
+        .helper-text {
+            font-size: 0.9em;
+            color: #555;
+            margin-top: 10px;
+        }
+        .contact-admin {
+            text-align: center;
+            margin-top: 2em;
+            padding: 1em;
+            background-color: #679b74;
+            color: white;
+        }
+        .contact-admin a {
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .contact-admin a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <img src="https://i.imgur.com/75tlt7m.png" alt="KANVAS MERCHANDISE Logo" />
+        <h1>LACAK ORDER</h1>
+        <h2>KANVAS MERCHANDISE</h2>
+    </header>
+
+    <div class="container" id="login-selection">
+        <h2>Login</h2>
+        <p class="helper-text">Silakan pilih jenis login Anda. Jika Anda adalah pelanggan, gunakan nomor invoice untuk melacak pesanan Anda. Jika Anda adalah admin, login dengan kredensial Anda untuk mengelola pesanan.</p>
+        <button onclick="showAdminLogin()">Login Admin</button>
+        <button onclick="showCustomerLogin()">Login Pelanggan</button>
+    </div>
+
+    <div class="container" id="admin-login-section" style="display: none;">
+        <h2>Login Admin</h2>
+        <p class="helper-text">Masukkan username dan password admin untuk mengakses panel pengelolaan pesanan.</p>
+        <input type="text" id="admin-username" placeholder="Username"><br>
+        <input type="password" id="admin-password" placeholder="Password"><br>
+        <button onclick="handleAdminLogin()">Login</button>
+        <button onclick="returnToSelection()">Kembali</button>
+    </div>
+
+    <div class="container" id="customer-login-section" style="display: none;">
+        <h2>Login Pelanggan</h2>
+        <p class="helper-text">Masukkan nomor invoice Anda untuk melihat status pesanan Anda.</p>
+        <input type="text" id="customer-invoice" placeholder="Nomor Invoice"><br>
+        <button onclick="handleCustomerLogin()">Lihat Progress</button>
+        <button onclick="returnToSelection()">Kembali</button>
+    </div>
+
+    <div class="container" id="admin-section" style="display: none;">
+        <h2>Admin Panel</h2>
+        <p class="helper-text">Gunakan panel ini untuk membuat dan mengelola nomor invoice pesanan pelanggan.</p>
+        <input type="text" id="new-invoice" placeholder="Nomor Invoice Baru">
+        <button onclick="createInvoice()">Buat Invoice</button>
+        <h3>Daftar Invoice</h3>
+        <ul id="invoice-list"></ul>
+        <button onclick="returnToSelection()">Logout</button>
+    </div>
+
+    <div class="container" id="tracking-section" style="display: none;">
+        <h2>Tracking Progress</h2>
+        <p class="helper-text">Lihat langkah-langkah proses produksi pesanan Anda. Langkah yang sudah selesai akan ditandai dengan warna hijau.</p>
+        <div id="progress-list" class="progress-bar"></div>
+        <button onclick="returnToSelection()">Logout</button>
+    </div>
+
+    <div class="contact-admin">
+        <p>Butuh bantuan? <a href="https://wa.me/6282257423324" target="_blank">Hubungi Admin via WhatsApp</a></p>
+    </div>
+
+    <script>
+        const adminCredentials = { username: "admin", password: "knvs1234" };
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCKdlD64iUBUOlu612gHL0cdcZCR0qj5SQ",
+            authDomain: "lacakorderansaya.firebaseapp.com",
+            databaseURL: "https://lacakorderansaya-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "lacakorderansaya",
+            storageBucket: "lacakorderansaya.firebasestorage.app",
+            messagingSenderId: "479863014737",
+            appId: "1:479863014737:web:fe1bdb5dbad73939753f70"
+        };
+
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        function showAdminLogin() {
+            document.getElementById('login-selection').style.display = 'none';
+            document.getElementById('admin-login-section').style.display = 'block';
+        }
+
+        function showCustomerLogin() {
+            document.getElementById('login-selection').style.display = 'none';
+            document.getElementById('customer-login-section').style.display = 'block';
+        }
+
+        function returnToSelection() {
+            document.getElementById('admin-login-section').style.display = 'none';
+            document.getElementById('customer-login-section').style.display = 'none';
+            document.getElementById('admin-section').style.display = 'none';
+            document.getElementById('tracking-section').style.display = 'none';
+            document.getElementById('login-selection').style.display = 'block';
+        }
+
+        function handleAdminLogin() {
+            const username = document.getElementById('admin-username').value;
+            const password = document.getElementById('admin-password').value;
+
+            if (username === adminCredentials.username && password === adminCredentials.password) {
+                showAdminPanel();
+            } else {
+                Swal.fire('Gagal', 'Username atau Password Admin salah!', 'error');
+            }
+        }
+
+        function handleCustomerLogin() {
+            const invoice = document.getElementById('customer-invoice').value;
+            const invoiceRef = database.ref(`invoices/${invoice}`);
+
+            invoiceRef.once('value').then((snapshot) => {
+                if (snapshot.exists()) {
+                    showTracking(invoice, snapshot.val());
+                } else {
+                    Swal.fire('Gagal', 'Nomor Invoice tidak ditemukan!', 'error');
+                }
+            });
+        }
+
+        function showAdminPanel() {
+            document.getElementById('admin-login-section').style.display = 'none';
+            document.getElementById('admin-section').style.display = 'block';
+            updateInvoiceList();
+        }
+
+        function showTracking(invoice, progressSteps) {
+            document.getElementById('customer-login-section').style.display = 'none';
+            document.getElementById('tracking-section').style.display = 'block';
+            renderProgress(progressSteps);
+        }
+
+        function createInvoice() {
+            const newInvoice = document.getElementById('new-invoice').value;
+            if (!newInvoice) {
+                Swal.fire('Gagal', 'Nomor Invoice tidak boleh kosong!', 'error');
+                return;
+            }
+
+            const invoiceRef = database.ref(`invoices/${newInvoice}`);
+            invoiceRef.once('value').then((snapshot) => {
+                if (snapshot.exists()) {
+                    Swal.fire('Gagal', 'Nomor Invoice sudah ada!', 'error');
+                } else {
+                    const progressSteps = [
+                        { name: "Desain", date: null },
+                        { name: "Briefing", date: null },
+                        { name: "Bahan", date: null },
+                        { name: "Potong", date: null },
+                        { name: "Sablon", date: null },
+                        { name: "Jahit", date: null },
+                        { name: "Finishing", date: null },
+                        { name: "Packaging", date: null },
+                        { name: "Selesai", date: null }
+                    ];
+                    invoiceRef.set(progressSteps).then(() => {
+                        updateInvoiceList();
+                        Swal.fire('Berhasil', `Invoice ${newInvoice} berhasil dibuat! Nomor ini dapat dibagikan ke pelanggan.`, 'success');
+                    });
+                }
+            });
+        }
+
+        function updateInvoiceList() {
+            const invoiceList = document.getElementById('invoice-list');
+            invoiceList.innerHTML = '';
+
+            const invoicesRef = database.ref('invoices');
+            invoicesRef.once('value').then((snapshot) => {
+                if (snapshot.exists()) {
+                    Object.keys(snapshot.val()).forEach(invoice => {
+                        const li = document.createElement('li');
+                        li.textContent = invoice;
+                        const editButton = document.createElement('button');
+                        editButton.textContent = 'Edit Progress';
+                        editButton.style.marginLeft = '10px';
+                        editButton.onclick = () => editProgress(invoice);
+                        const deleteButton = document.createElement('button');
+                        deleteButton.textContent = 'Hapus';
+                        deleteButton.style.marginLeft = '10px';
+                        deleteButton.onclick = () => deleteInvoice(invoice);
+                        li.appendChild(editButton);
+                        li.appendChild(deleteButton);
+                        invoiceList.appendChild(li);
+                    });
+                }
+            });
+        }
+
+        function deleteInvoice(invoice) {
+            Swal.fire({
+                title: 'Apakah Anda yakin?',
+                text: "Anda tidak dapat mengembalikan invoice yang telah dihapus!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Ya, hapus!'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    const invoiceRef = database.ref(`invoices/${invoice}`);
+                    invoiceRef.remove().then(() => {
+                        updateInvoiceList();
+                        Swal.fire('Dihapus!', 'Invoice telah dihapus.', 'success');
+                    });
+                }
+            });
+        }
+
+        function editProgress(invoice) {
+            const invoiceRef = database.ref(`invoices/${invoice}`);
+            invoiceRef.once('value').then((snapshot) => {
+                const progressSteps = snapshot.val();
+                let stepOptions = '';
+                progressSteps.forEach((step, index) => {
+                    stepOptions += `<option value="${index}" ${step.date ? 'disabled' : ''}>${step.name}</option>`;
+                });
+
+                Swal.fire({
+                    title: `Edit Progress Invoice: ${invoice}`,
+                    html: `<label for="progress-select">Pilih langkah:</label>
+                           <select id="progress-select">${stepOptions}</select>`,
+                    showCancelButton: true,
+                    confirmButtonText: 'Tandai Selesai',
+                    preConfirm: () => {
+                        const selectedIndex = document.getElementById('progress-select').value;
+                        if (selectedIndex !== null) {
+                            const today = new Date().toLocaleDateString();
+                            progressSteps[selectedIndex].date = today;
+                            invoiceRef.set(progressSteps).then(() => {
+                                updateInvoiceList();
+                                Swal.fire('Berhasil', 'Progres telah diperbarui.', 'success');
+                            });
+                        }
+                    }
+                });
+            });
+        }
+
+        function renderProgress(progressSteps) {
+            const progressList = document.getElementById('progress-list');
+            progressList.innerHTML = '';
+            progressSteps.forEach((step) => {
+                const stepItem = document.createElement('div');
+                stepItem.classList.add('progress-item');
+
+                const status = document.createElement('div');
+                status.classList.add('status');
+                if (step.date) {
+                    status.classList.add('completed');
+                }
+
+                const label = document.createElement('span');
+                label.textContent = step.name;
+
+                const date = document.createElement('span');
+                date.classList.add('date');
+                date.textContent = step.date ? step.date : "Belum selesai";
+
+                stepItem.appendChild(status);
+                stepItem.appendChild(label);
+                stepItem.appendChild(date);
+
+                progressList.appendChild(stepItem);
+            });
+        }
+    </script>
+</body>
+</html>
