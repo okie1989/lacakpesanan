@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -147,9 +149,111 @@ input {
         .contact-admin a:hover {
             text-decoration: underline;
         }
+
+        /* Gaya Gallery */
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .gallery-item {
+            position: relative;
+            cursor: pointer;
+            transition: transform 0.3s;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .gallery-item:hover {
+            transform: scale(1.05);
+        }
+
+        .gallery-item img {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            border: 2px solid #ddd;
+        }
+
+        /* Modal Gallery */
+        .gallery-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            max-width: 90%;
+            max-height: 90%;
+            position: relative;
+        }
+
+        .modal-media {
+            max-width: 100%;
+            max-height: 80vh;
+            object-fit: contain;
+        }
+
+        .modal-caption {
+            color: white;
+            text-align: center;
+            padding: 10px;
+        }
+
+        .modal-nav {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255,255,255,0.3);
+            padding: 15px;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+
+        .prev-btn { left: 20px; }
+        .next-btn { right: 20px; }
+        .close-btn {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            color: white;
+            font-size: 40px;
+            cursor: pointer;
+        }
+
+
+        @media (max-width: 600px) {
+    .gallery-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .modal-content {
+        max-width: 95%;
+    }
+    
+    .modal-nav {
+        padding: 10px;
+        font-size: 18px;
+    }
+}
+
+        
     </style>
 </head>
 <body>
+
+     
+
+
     <header>
         <img src="https://i.imgur.com/75tlt7m.png" alt="KANVAS MERCHANDISE Logo" />
         <h1>LACAK PESANAN</h1>
@@ -186,6 +290,10 @@ input {
         <button onclick="createInvoice()">Buat Invoice</button>
         <h3>Daftar Invoice</h3>
         <ul id="invoice-list"></ul>
+        <h3>Upload Foto/Video Dokumentasi</h3>
+        <input type="text" id="invoice-to-upload" placeholder="Nomor Invoice">
+        <input type="text" id="photo-url" placeholder="URL Foto/Video">
+        <button onclick="uploadPhoto()">Upload Foto/Video</button>
         <button onclick="returnToSelection()">Logout</button>
     </div>
 
@@ -193,15 +301,29 @@ input {
         <h2>Tracking Progress</h2>
         <p class="helper-text">Lihat langkah-langkah proses produksi pesanan Anda. Langkah yang sudah selesai akan ditandai dengan warna hijau.</p>
         <div id="progress-list" class="progress-bar"></div>
-        <button onclick="returnToSelection()">Logout</button>
+        <h3>Foto/Video Dokumentasi</h3>
+        <div class="gallery-grid" id="gallery-container"></div>
+        <!-- Gallery Modal -->
+     <div class="gallery-modal" id="galleryModal">
+        <span class="close-btn" onclick="closeModal()">&times;</span>
+        <div class="modal-content">
+            <div class="modal-nav prev-btn" onclick="navigateMedia(-1)">❮</div>
+            <img class="modal-media" id="modalMedia">
+            <div class="modal-caption" id="modalCaption"></div>
+            <div class="modal-nav next-btn" onclick="navigateMedia(1)">❯</div>
+        </div>
     </div>
+    <button onclick="returnToSelection()">Logout</button>
+</div>
+    
 
     <div class="contact-admin">
         <p>Butuh bantuan? <a href="https://wa.me/6282257423324" target="_blank">Hubungi Admin via WhatsApp</a></p>
     </div>
 
     <script>
-        const adminCredentials = { username: "admin", password: "knvs1234" };
+        let globalProgressSteps = [];
+        const adminCredentials = { username: "admin", password: "1" };
 
         // Firebase configuration
         const firebaseConfig = {
@@ -273,35 +395,36 @@ input {
         }
 
         function createInvoice() {
-            const newInvoice = document.getElementById('new-invoice').value;
-            if (!newInvoice) {
-                Swal.fire('Gagal', 'Nomor Invoice tidak boleh kosong!', 'error');
-                return;
-            }
+    const newInvoice = document.getElementById('new-invoice').value;
+    if (!newInvoice) {
+        Swal.fire('Gagal', 'Nomor Invoice tidak boleh kosong!', 'error');
+        return;
+    }
 
-            const invoiceRef = database.ref(`invoices/${newInvoice}`);
-            invoiceRef.once('value').then((snapshot) => {
-                if (snapshot.exists()) {
-                    Swal.fire('Gagal', 'Nomor Invoice sudah ada!', 'error');
-                } else {
-                    const progressSteps = [
-                        { name: "Desain", date: null },
-                        { name: "Briefing", date: null },
-                        { name: "Bahan", date: null },
-                        { name: "Potong", date: null },
-                        { name: "Sablon", date: null },
-                        { name: "Jahit", date: null },
-                        { name: "Finishing", date: null },
-                        { name: "Packaging", date: null },
-                        { name: "Selesai", date: null }
-                    ];
-                    invoiceRef.set(progressSteps).then(() => {
-                        updateInvoiceList();
-                        Swal.fire('Berhasil', `Invoice ${newInvoice} berhasil dibuat! Nomor ini dapat dibagikan ke pelanggan.`, 'success');
-                    });
-                }
+    const invoiceRef = database.ref(`invoices/${newInvoice}`);
+    invoiceRef.once('value').then((snapshot) => {
+        if (snapshot.exists()) {
+            Swal.fire('Gagal', 'Nomor Invoice sudah ada!', 'error');
+        } else {
+            // Pastikan setiap langkah memiliki 'photos: []'
+            const progressSteps = [
+                { name: "Desain", date: null, photos: [] },
+                { name: "Briefing", date: null, photos: [] },
+                { name: "Bahan", date: null, photos: [] },
+                { name: "Potong", date: null, photos: [] },
+                { name: "Sablon", date: null, photos: [] },
+                { name: "Jahit", date: null, photos: [] },
+                { name: "Finishing", date: null, photos: [] },
+                { name: "Packaging", date: null, photos: [] },
+                { name: "Selesai", date: null, photos: [] }
+            ];
+            invoiceRef.set(progressSteps).then(() => {
+                updateInvoiceList();
+                Swal.fire('Berhasil', `Invoice ${newInvoice} berhasil dibuat!`, 'success');
             });
         }
+    });
+}
 
         function updateInvoiceList() {
             const invoiceList = document.getElementById('invoice-list');
@@ -379,33 +502,159 @@ input {
             });
         }
 
+        let currentMediaIndex = 0;
+        let allMedia = [];
+
         function renderProgress(progressSteps) {
+            window.globalProgressSteps = progressSteps;
             const progressList = document.getElementById('progress-list');
-            progressList.innerHTML = '';
-            progressSteps.forEach((step) => {
-                const stepItem = document.createElement('div');
-                stepItem.classList.add('progress-item');
+            const galleryContainer = document.getElementById('gallery-container');
 
-                const status = document.createElement('div');
-                status.classList.add('status');
-                if (step.date) {
-                    status.classList.add('completed');
-                }
+    progressList.innerHTML = '';
+    galleryContainer.innerHTML = '';
 
-                const label = document.createElement('span');
-                label.textContent = step.name;
+    progressSteps.forEach((step) => {
+        const stepItem = document.createElement('div');
+        stepItem.classList.add('progress-item');
 
-                const date = document.createElement('span');
-                date.classList.add('date');
-                date.textContent = step.date ? step.date : "Belum selesai";
-
-                stepItem.appendChild(status);
-                stepItem.appendChild(label);
-                stepItem.appendChild(date);
-
-                progressList.appendChild(stepItem);
-            });
+        const status = document.createElement('div');
+        status.classList.add('status');
+        if (step.date) {
+            status.classList.add('completed');
         }
+
+        const label = document.createElement('span');
+        label.textContent = step.name;
+
+        const date = document.createElement('span');
+        date.classList.add('date');
+        date.textContent = step.date ? step.date : "Belum selesai";
+
+        stepItem.appendChild(status);
+        stepItem.appendChild(label);
+        stepItem.appendChild(date);
+
+        progressList.appendChild(stepItem);
+
+    });
+
+
+allMedia = [];
+progressSteps.forEach((step, stepIndex) => {
+    if(step && step.photos && Array.isArray(step.photos)) {
+        step.photos.forEach((photo, photoIndex) => {
+            allMedia.push({
+                url: photo,
+                step: stepIndex,
+                photoIndex: photoIndex
+            });
+        });
+    }
+});
+
+           // Render gallery
+    allMedia.forEach((media, index) => {
+        const item = document.createElement('div');
+        item.className = 'gallery-item';
+        item.innerHTML = `
+            <img src="${media.url}" 
+                 alt="Progress ${progressSteps[media.step].name}" 
+                 onclick="openModal(${index})">
+            <div class="progress-badge">
+                ${progressSteps[media.step].name}
+            </div>
+        `;
+        galleryContainer.appendChild(item); // Gunakan gallery-container
+    });
+        }
+
+        // Fungsi modal gallery
+        function openModal(index) {
+    currentMediaIndex = index;
+    const modal = document.getElementById('galleryModal');
+    const media = allMedia[currentMediaIndex];
+    
+    // Pastikan media.step valid
+    if(!window.globalProgressSteps || !window.globalProgressSteps[media.step]) {
+        Swal.fire('Error', 'Data progress tidak ditemukan', 'error');
+        return;
+    }
+    
+    const step = window.globalProgressSteps[media.step];
+    
+    // Update tampilan
+    document.getElementById('modalMedia').src = media.url;
+    document.getElementById('modalCaption').innerHTML = `
+        <strong>${step?.name || 'Step tidak diketahui'}</strong><br>
+        ${step?.date || 'Tanggal belum tersedia'}
+    `;
+    
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+        function closeModal() {
+            document.getElementById('galleryModal').style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+
+        function navigateMedia(direction) {
+            currentMediaIndex = (currentMediaIndex + direction + allMedia.length) % allMedia.length;
+            openModal(currentMediaIndex);
+        }
+
+        // Zoom sederhana dengan double click
+        document.getElementById('modalMedia').ondblclick = function() {
+            this.style.transform = this.style.transform === 'scale(2)' ? 'scale(1)' : 'scale(2)';
+            this.style.transition = 'transform 0.3s';
+        }
+        
+
+
+function uploadPhoto() {
+    const invoice = document.getElementById('invoice-to-upload').value;
+    const photoUrl = document.getElementById('photo-url').value;
+
+    if (!invoice || !photoUrl) {
+        Swal.fire('Gagal', 'Nomor Invoice dan URL Foto tidak boleh kosong!', 'error');
+        return;
+    }
+
+    const invoiceRef = database.ref(`invoices/${invoice}`);
+    invoiceRef.once('value').then((snapshot) => {
+        if (snapshot.exists()) {
+            const progressSteps = snapshot.val();
+            const stepOptions = progressSteps.map((step, index) => `<option value="${index}">${step.name}</option>`).join('');
+
+            Swal.fire({
+                title: `Upload Foto untuk Invoice: ${invoice}`,
+                html: `<label for="progress-select">Pilih langkah:</label>
+                       <select id="progress-select">${stepOptions}</select>`,
+                showCancelButton: true,
+                confirmButtonText: 'Upload',
+                preConfirm: () => {
+                    const selectedIndex = document.getElementById('progress-select').value;
+                    if (selectedIndex !== null) {
+                        // Pastikan properti 'photos' ada sebelum menggunakan push()
+                        if (!progressSteps[selectedIndex].photos) {
+                            progressSteps[selectedIndex].photos = []; // Inisialisasi array jika tidak ada
+                        }
+                        progressSteps[selectedIndex].photos.push(photoUrl);
+                        invoiceRef.set(progressSteps).then(() => {
+                            Swal.fire('Berhasil', 'Foto berhasil diupload.', 'success');
+                        });
+                    }
+                }
+            });
+        } else {
+            Swal.fire('Gagal', 'Nomor Invoice tidak ditemukan!', 'error');
+        }
+    });
+
+    if(photoUrl.includes('dropbox.com')) {
+    photoUrl = photoUrl.replace('www.dropbox.com', 'dl.dropboxusercontent.com');
+}
+}
     </script>
 </body>
 </html>
