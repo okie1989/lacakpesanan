@@ -1,5 +1,7 @@
 
 
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -377,7 +379,7 @@ input {
                 if (snapshot.exists()) {
                     showTracking(invoice, snapshot.val());
                 } else {
-                    Swal.fire('Gagal', 'Nomor Invoice tidak ditemukan!', 'error');
+                    Swal.fire('Gagal', 'Mohon Maaf Nomor Invoice tidak ditemukan atau jumlah order anda kurang dari 30pcs!', 'error');
                 }
             });
         }
